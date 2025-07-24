@@ -1,0 +1,48 @@
+# Environment variables
+.env
+
+# Byte Pair Encoding (BPE) files
+*.bpe
+
+# PyTorch model files
+*.pt
+*.bin
+
+# Hugging Face cache
+.cache/
+# Hugging Face datasets cache
+datasets/
+# Hugging Face transformers cache
+transformers_cache/
+# Hugging Face tokenizers cache
+tokenizers_cache/
+# PyTorch Lightning logs
+lightning_logs/
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+# Python bytecode files
+__pycache__/
+# Python virtual environment
+venv/
+# Local environment variables
+.env
+# Logs
+logs/
+# Temporary files
+*.tmp
+# Backup files
+*.bak
+# Configuration files
+*.cfg
+# Model configuration files
+*.json
+# Model weights
+*.weights
+# Model checkpoints
+*.ckpt
+# Data files
+*.data
+# Model training outputs
+*.output
+# Model evaluation outputs
+*.eval
