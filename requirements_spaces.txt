@@ -1,0 +1,66 @@
+# 🚀 Deploying MedGemma Clinical Reasoning AI to Hugging Face Spaces
+
+This guide shows you how to deploy your MedGemma Clinical Reasoning AI application to Hugging Face Spaces for easy sharing and demonstration.
+
+## 📋 Prerequisites
+
+1. **Hugging Face Account**: Sign up at [huggingface.co](https://huggingface.co)
+2. **Hugging Face Token**: Get from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+3. **Git** installed on your system
+
+## 🎯 Deployment Steps
+
+### Step 1: Create a New Space
+
+1. Go to [huggingface.co/spaces](https://huggingface.co/spaces)
+2. Click **"Create new Space"**
+3. Configure your Space:
+   - **Space name**: `medgemma-clinical-reasoning` (or your choice)
+   - **License**: `MIT` (recommended)
+   - **SDK**: Select **"Streamlit"**
+   - **Visibility**: Choose **Public** or **Private**
+   - **Hardware**: Start with **CPU Basic (Free)** for testing
+
+### Step 2: Clone Your Space Repository
+
+```bash
+# Clone the empty space repository
+git clone https://huggingface.co/spaces/YOUR_USERNAME/medgemma-clinical-reasoning
+cd medgemma-clinical-reasoning
+```
+
+### Step 3: Add Your Application Files
+
+Copy these files to your Space repository:
+
+**Required Files:**
+```
+medgemma-clinical-reasoning/
+├── app.py                              # Main Streamlit app (rename from streamlit_clinical_reasoning_app_hosted.py)
+├── requirements.txt                    # Dependencies
+├── README.md                          # Space documentation
+├── .env.example                       # Environment template
+└── .gitignore                         # Git ignore file
+```
+
+**Copy Commands:**
+```bash
+# Copy the hosted version as the main app
+cp ../streamlit_clinical_reasoning_app_hosted.py ./app.py
+
+# Copy requirements (we'll update this)
+cp ../requirements.txt ./requirements.txt
+
+# Copy other files
+cp ../.env.example ./.env.example
+cp ../.gitignore ./.gitignore
+```
+
+### Step 4: Update requirements.txt for Spaces
+
+<function_calls>
+<invoke name="create_file">
+<parameter name="content">streamlit>=1.28.0
+requests>=2.31.0
+pandas>=2.0.0
+python-dotenv>=1.0.0
