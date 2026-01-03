@@ -129,6 +129,9 @@ def load_medgemma_model():
             """)
             st.stop()
         
+        # Login to HuggingFace with the token (required for gated models like MedGemma)
+        login(token=hf_token)
+        
         with st.spinner("Loading MedGemma model... This may take a few minutes on first run."):
             # Load processor
             processor = AutoProcessor.from_pretrained(MODEL_NAME)

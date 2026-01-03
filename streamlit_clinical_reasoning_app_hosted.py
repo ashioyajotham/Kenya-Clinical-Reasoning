@@ -7,6 +7,13 @@ import warnings
 from dotenv import load_dotenv
 import json
 
+# Try to import gradio_client for MedGemma Space API
+try:
+    from gradio_client import Client as GradioClient
+    GRADIO_AVAILABLE = True
+except ImportError:
+    GRADIO_AVAILABLE = False
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -14,7 +21,7 @@ warnings.filterwarnings('ignore')
 
 # Page configuration
 st.set_page_config(
-    page_title="MedGemma Clinical Reasoning AI - Hosted",
+    page_title="MedGemma Clinical Reasoning AI",
     page_icon="🏥",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -137,46 +144,56 @@ Clinical Response:"""
     
     return structured_prompt
 
-def query_huggingface_inference(prompt, hf_token, max_new_tokens=512):
-    """Query Hugging Face Inference API for MedGemma"""
+def query_huggingface_inference(prompt, hf_token, max_new_tokens=2048, model="google/medgemma-4b-it"):
+    """Query MedGemma via HuggingFace Space Gradio API
     
-    API_URL = "https://api-inference.huggingface.co/models/google/medgemma-4b-it"
-    headers = {
-        "Authorization": f"Bearer {hf_token}",
-        "Content-Type": "application/json"
-    }
+    Since MedGemma is not available through HF Inference Providers (it's a gated model),
+    we use a public Space that hosts MedGemma with ZeroGPU.
+    """
     
-    # Simplified prompt for API
-    simple_prompt = f"As a medical expert, analyze this clinical case:\n\n{prompt}\n\nProvide your clinical assessment:"
+    if not GRADIO_AVAILABLE:
+        return "Error: gradio_client not installed. Run: pip install gradio_client"
     
-    payload = {
-        "inputs": simple_prompt,
-        "parameters": {
-            "max_new_tokens": max_new_tokens,
-            "temperature": 0.1,
-            "do_sample": False,
-            "return_full_text": False
-        }
-    }
-    
+    # Medical system prompt for clinical reasoning
+    system_prompt = """You are an expert medical clinician with extensive experience in clinical reasoning and diagnosis. 
+You are working in Kenya and are familiar with local healthcare contexts, common diseases in the region (including malaria, TB, HIV), 
+and resource-appropriate medicine. Provide comprehensive, evidence-based clinical assessments.
+
+When analyzing cases, consider:
+1. Patient presentation and vital signs
+2. Differential diagnoses ranked by likelihood
+3. Recommended investigations appropriate to the healthcare level
+4. Evidence-based treatment recommendations
+5. Red flags and when to refer
+6. Follow-up care recommendations"""
+
     try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+        # Connect to a public MedGemma Space (uses ZeroGPU)
+        client = GradioClient('warshanks/medgemma-4b-it')
         
-        if response.status_code == 200:
-            result = response.json()
-            if isinstance(result, list) and len(result) > 0:
-                return result[0].get("generated_text", "").strip()
-            elif isinstance(result, dict):
-                return result.get("generated_text", "").strip()
-            else:
-                return "Error: Unexpected response format"
-                
-        elif response.status_code == 503:
-            return "Model is currently loading. Please try again in a few moments."
-        elif response.status_code == 429:
-            return "Rate limit exceeded. Please wait a moment and try again."
+        # Call the MedGemma model via Gradio API
+        result = client.predict(
+            message={'text': prompt, 'files': []},
+            param_2=system_prompt,
+            param_3=max_new_tokens,
+            api_name='/chat'
+        )
+        
+        if isinstance(result, str):
+            return result.strip()
+        elif isinstance(result, dict):
+            return str(result)
         else:
-            return f"API Error {response.status_code}: {response.text}"
+            return str(result)
+            
+    except Exception as e:
+        error_msg = str(e)
+        if "exceeded your GPU quota" in error_msg.lower():
+            return "MedGemma Space GPU quota exceeded. Please try again in a few minutes."
+        elif "is currently loading" in error_msg.lower() or "loading" in error_msg.lower():
+            return "MedGemma model is loading. Please wait a moment and try again."
+        else:
+            return f"MedGemma API Error: {error_msg}"
             
     except requests.exceptions.Timeout:
         return "Request timed out. The model may be busy. Please try again."
@@ -251,15 +268,19 @@ def main():
         st.markdown("""
         **To use this hosted app, you need authentication:**
         
-        **Option 1: Hugging Face (Recommended)**
-        1. Get a token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-        2. Add `HF_TOKEN=your_token` to your environment variables
+        **For Hugging Face Spaces Deployment:**
+        1. Go to your Space's **Settings** page
+        2. Scroll to **Repository secrets**
+        3. Add a secret named `HF_TOKEN` with your [Hugging Face token](https://huggingface.co/settings/tokens)
+        4. The Space will restart automatically
         
-        **Option 2: Google Cloud Model Garden**
-        1. Set up Google Cloud API access
-        2. Add `GOOGLE_CLOUD_API_KEY=your_key` to your environment variables
+        **For Local Development:**
+        1. Create a `.env` file in the project directory
+        2. Add `HF_TOKEN=your_token_here`
+        3. Restart the app
         
-        **For local development:** Use the `.env` file as described in the README.
+        **Alternative: Google Cloud Model Garden**
+        - Add `GOOGLE_CLOUD_API_KEY` secret/environment variable
         """)
         st.stop()
     
@@ -267,18 +288,15 @@ def main():
     with st.sidebar:
         st.header("⚙️ Clinical Settings")
         
-        # API Selection
-        st.header("🔗 API Configuration")
-        api_choice = st.selectbox(
-            "Select Inference API",
-            ["Hugging Face Inference API", "Google Cloud Model Garden", "Fallback Mode"],
-            index=0 if hf_token else 2
-        )
+        # MedGemma Status
+        st.header("🩺 MedGemma Status")
+        st.success("✅ Using Google MedGemma-4B-IT")
+        st.caption("Specialized medical AI via Gradio API")
+        st.caption("Model: google/medgemma-4b-it")
         
-        if api_choice == "Hugging Face Inference API" and not hf_token:
-            st.warning("HF_TOKEN not found. Please set up authentication.")
-        elif api_choice == "Google Cloud Model Garden" and not google_api_key:
-            st.warning("Google Cloud API key not found. Please set up authentication.")
+        # Set defaults for internal use
+        api_choice = "Hugging Face Inference API"
+        model_choice = "google/medgemma-4b-it"
         
         # Healthcare context settings
         county = st.selectbox(
@@ -305,19 +323,18 @@ def main():
         
         # Model parameters
         st.header("🤖 AI Parameters")
-        max_tokens = st.slider("Max Response Length", 256, 1024, 512)
+        max_tokens = st.slider("Max Response Length", 512, 4096, 2048)
         
-        # API Status
-        st.header("📊 API Status")
-        if api_choice == "Hugging Face Inference API":
-            st.info("🤗 Using Hugging Face Inference API")
-            st.caption("Serverless inference - no local GPU needed")
-        elif api_choice == "Google Cloud Model Garden":
-            st.info("☁️ Using Google Cloud Model Garden")
-            st.caption("Professional hosted inference")
-        else:
-            st.warning("🔄 Using Fallback Mode")
-            st.caption("No API access - structured clinical framework only")
+        # About MedGemma
+        st.header("ℹ️ About MedGemma")
+        st.info("""
+        **MedGemma** is Google's medical AI model 
+        fine-tuned for clinical reasoning tasks.
+        
+        - Built on Gemma 2
+        - Specialized medical training
+        - Optimized for clinical Q&A
+        """)
     
     # Main content
     col1, col2 = st.columns([1, 1])
@@ -393,7 +410,7 @@ Clinical Presentation:
                 try:
                     # Generate response based on selected API
                     if api_choice == "Hugging Face Inference API" and hf_token:
-                        response = query_huggingface_inference(structured_prompt, hf_token, max_tokens)
+                        response = query_huggingface_inference(structured_prompt, hf_token, max_tokens, model_choice)
                     elif api_choice == "Google Cloud Model Garden" and google_api_key:
                         response = query_google_cloud_api(structured_prompt, google_api_key, max_tokens)
                     else:
@@ -402,10 +419,11 @@ Clinical Presentation:
                     processing_time = time.time() - start_time
                     
                     # Display response
+                    model_display = model_choice.split("/")[-1] if api_choice == "Hugging Face Inference API" else api_choice
                     st.markdown(f"""
                     <div class="ai-response">
                         <h4>🔍 Clinical Assessment</h4>
-                        <p><strong>API Used:</strong> {api_choice}</p>
+                        <p><strong>Model:</strong> {model_display}</p>
                         <p><strong>Processing Time:</strong> {processing_time:.2f} seconds</p>
                     </div>
                     """, unsafe_allow_html=True)

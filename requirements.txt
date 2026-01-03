@@ -7,3 +7,4 @@ huggingface_hub>=0.17.0
 pandas>=2.0.0
 numpy>=1.24.0
 python-dotenv>=1.0.0
+gradio_client>=1.0.0
